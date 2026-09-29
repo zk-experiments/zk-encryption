@@ -34,9 +34,9 @@ pub mod circuits {
 }
 
 /// The noir-zk revision this layer is frozen and folded with (its kernels'
-/// family is in every pipeline root): the `feat/pipelines` branch until
-/// noir-zk 0.3.0 is on crates.io. `Cargo.toml` and `mise.toml` pin the same.
-pub const NOIR_ZK_REV: &str = "dd2d33f";
+/// family is in every pipeline root): the release tag of the version
+/// `Cargo.toml` and `mise.toml` pin.
+pub const NOIR_ZK_REV: &str = "v0.3.0";
 
 /// The wallet library (`zk-encryption`): the primitives, the ratchet, `Sender`,
 /// `Receiver`, `Bundle`, the `Envelope` event, `Payload`, `NoirToml`.

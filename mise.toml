@@ -12,16 +12,16 @@ NOIR_VERSION = "1.0.0-rc.3"
 # Barretenberg for gates, verification keys and Chonk proofs: the nightly
 # built on NOIR_VERSION's commit. A bb bump changes every verification key.
 BB_VERSION = "7.0.0-nightly.20260927"
-# noir-zk (registries, codegen, the generic kernels): the `feat/pipelines`
-# branch until 0.3.0 is released; rust/Cargo.toml pins the same rev.
-NOIR_ZK_REV = "dd2d33f"
+# noir-zk (registries, codegen, the generic kernels) from crates.io;
+# rust/Cargo.toml pins the same version.
+NOIR_ZK_VERSION = "0.3.0"
 # Per-version toolchain directories: this repository never replaces the
 # nargo or bb other projects use from ~/.nargo and ~/.bb.
 NARGO_HOME = "{{env.HOME}}/.toolchains/noir-{{env.NOIR_VERSION}}"
 BB_PATH = "{{env.HOME}}/.toolchains/bb-{{env.BB_VERSION}}"
 NARGO = "{{env.NARGO_HOME}}/bin/nargo"
 BB = "{{env.BB_PATH}}/bb"
-NOIR_ZK = "{{env.HOME}}/.toolchains/noir-zk-{{env.NOIR_ZK_REV}}/bin/noir-zk"
+NOIR_ZK = "{{env.HOME}}/.toolchains/noir-zk-{{env.NOIR_ZK_VERSION}}/bin/noir-zk"
 
 [tasks."install:noir"]
 description = "Install nargo $NOIR_VERSION into $NARGO_HOME (no shell profile changes)"
@@ -59,12 +59,12 @@ description = "Install nargo + bb at the pinned versions"
 depends = ["install:noir", "install:bb"]
 
 [tasks."install:noir-zk"]
-description = "Install the noir-zk CLI at the rev rust/Cargo.toml pins, in its own toolchain directory"
+description = "Install the noir-zk CLI at the version rust/Cargo.toml pins, in its own toolchain directory"
 shell = "bash -c"
 run = '''
 set -euo pipefail
-root="$HOME/.toolchains/noir-zk-$NOIR_ZK_REV"
-[ -x "$root/bin/noir-zk" ] || cargo install --locked --git https://github.com/zk-experiments/noir-zk --rev "$NOIR_ZK_REV" noir-zk-cli --root "$root"
+root="$HOME/.toolchains/noir-zk-$NOIR_ZK_VERSION"
+[ -x "$root/bin/noir-zk" ] || cargo install --locked noir-zk-cli --version "=$NOIR_ZK_VERSION" --root "$root"
 '''
 
 [tasks."compile"]
