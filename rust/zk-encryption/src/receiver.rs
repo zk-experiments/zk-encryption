@@ -48,7 +48,12 @@ impl Receiver {
     /// A receiver with fresh long-term keys, holding `window` chain keys
     /// ahead and at most `window` skipped keys per channel.
     pub fn generate(pk: Fr, window: u64) -> Self {
-        Self::new(ReceiverKeys::generate(), pk, window, window as usize)
+        Self::new(
+            ReceiverKeys::generate(),
+            pk,
+            window,
+            usize::try_from(window).expect("window fits usize"),
+        )
     }
 
     pub fn new(keys: ReceiverKeys, pk: Fr, window: u64, max_skipped: usize) -> Self {
@@ -83,7 +88,7 @@ impl Receiver {
 
     /// Consumed C_t values kept: a window plus a margin per channel.
     pub fn consumed_limit(&self) -> usize {
-        (self.window as usize + 4) * self.sessions.len().max(1)
+        (usize::try_from(self.window).expect("window fits usize") + 4) * self.sessions.len().max(1)
     }
 
     /// Consumed C_t values remembered.
@@ -125,6 +130,8 @@ impl Receiver {
     /// else test the tag and, on a match, derive S_0 (checking the carried
     /// ciphertext and C_0). Open the note and DG1 and check the note against
     /// C0 first; only then consume the chain key or open the channel.
+    // The one-arm match keeps the error value for `Scan::Invalid`.
+    #[allow(clippy::single_match_else)]
     pub fn scan(&mut self, d: &Delivery) -> Scan {
         let e = &d.envelope;
         let held = self
@@ -149,7 +156,9 @@ impl Receiver {
         };
         let (note, dg1) = match self.open(d, s) {
             Ok(x) => x,
-            Err(err) => return Scan::Invalid(err),
+            Err(err) => {
+                return Scan::Invalid(err);
+            }
         };
         match session {
             Some(i) => {

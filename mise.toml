@@ -80,6 +80,30 @@ set -euo pipefail
 (cd rust && cargo test --release --all-features)
 '''
 
+# noir-zk derives verification keys against a pinned SRS in ~/.bb-crs (2^20+1
+# BN254 points, SHA-256 0f238856…; 2^15 Grumpkin points, 72b8cdad…) and never
+# downloads it itself. BN254: the prefix of bb's compressed file from Aztec's
+# CRS host, expanded by scripts/bn254_srs.py. Grumpkin: bb generates its
+# grumpkin_g1_v2.flat.dat from a fixed generator the first time it proves a
+# Chonk stack; the 2 MB prefix noir-zk pins is committed in resources/srs so
+# CI needs no proof to get it.
+[tasks."srs"]
+description = "Provision the SRS noir-zk pins in ~/.bb-crs (BN254 from Aztec's CRS host, Grumpkin from resources/srs)"
+shell = "bash -c"
+run = '''
+set -euo pipefail
+crs="$HOME/.bb-crs"
+mkdir -p "$crs"
+cp -n resources/srs/grumpkin_g1_v2.flat.dat "$crs/" 2>/dev/null || true
+points=$(( (1 << 20) + 1 ))
+if [ "$(wc -c < "$crs/bn254_g1.dat" 2>/dev/null || echo 0)" -lt $(( points * 64 )) ]; then
+  curl -fsS -r 0-$(( points * 32 - 1 )) -o "$crs/bn254_g1_compressed.prefix" https://crs.aztec-cdn.foundation/g1_compressed.dat
+  python3 scripts/bn254_srs.py "$crs/bn254_g1_compressed.prefix" "$crs/bn254_g1.dat" "$points"
+  rm -f "$crs/bn254_g1_compressed.prefix"
+fi
+ls -l "$crs"
+'''
+
 [tasks."freeze"]
 description = "Freeze the compiled circuits into rust/zk-encryption-circuits/{circuits,resources,assets} (the bytecode is bundled from assets/)"
 depends = ["install:noir-zk"]

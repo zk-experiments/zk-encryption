@@ -123,7 +123,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.bb-crs
-          key: bb-crs-${{ hashFiles('mise.toml') }}
+          key: noir-zk-srs-0f238856e557-72b8cdad9da8
+      - name: Provision the SRS noir-zk pins
+        run: mise run srs
       - name: The compiled circuits match their frozen pins
         run: mise run freeze:check
       - name: Committed measurements are current
@@ -305,10 +307,11 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.bb-crs
-          key: bb-crs-${{ hashFiles('mise.toml') }}
+          key: noir-zk-srs-0f238856e557-72b8cdad9da8
       - name: Compile and check the circuits against their pins
         run: |
           mise run compile
+          mise run srs
           mise run freeze:check
       - name: Write the release assets
         run: mise run release:assets

@@ -73,7 +73,7 @@ impl Bundle {
             Ek::Inline(e) => (1, e),
         };
         b.push(kind);
-        b.extend((ek.len() as u16).to_be_bytes());
+        b.extend(u16::try_from(ek.len()).expect("ek fits u16").to_be_bytes());
         b.extend(ek);
         b.extend(self.not_before.to_be_bytes());
         b.extend(self.not_after.to_be_bytes());

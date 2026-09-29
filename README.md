@@ -87,6 +87,7 @@ The session precedes every position bound to `ctx`/`C_t`; an envelope's link is 
 - `noir/circuits/session`, `noir/circuits/envelope6`: the two apps with a `Prover.toml` sample each.
 - `rust/zk-encryption`: the wallet library ([README](rust/zk-encryption/README.md)).
 - `rust/zk-encryption-circuits`: the layer ([README](rust/zk-encryption-circuits/README.md)): `circuits/manifest.toml`, `resources/` and `assets/` written by `noir-zk freeze`; `src/bin/vectors` (writes the Noir tests' vectors from the wallet library) and `src/bin/catalog` (the release catalog).
+- `resources/srs/grumpkin_g1_v2.flat.dat`: the 2^15-point Grumpkin CRS prefix noir-zk pins (bb generates it from a fixed generator when it first proves a Chonk stack; committed so CI can derive keys without proving); `scripts/bn254_srs.py` expands the BN254 prefix from Aztec's CRS host (`mise run srs`).
 - `measurements.json`: Chonk gates of the two apps.
 
 ## How to run
@@ -95,6 +96,7 @@ The toolchain is pinned in `mise.toml` (nargo 1.0.0-rc.3, bb 7.0.0-nightly.20260
 
 ```sh
 mise run compile          # nargo compile --workspace (noir/)
+mise run srs              # the SRS noir-zk pins, into ~/.bb-crs (once)
 mise run test             # nargo test + cargo test --release --all-features
 mise run freeze           # noir-zk freeze ... --library zk-encryption@<version> (-- --check via freeze:check)
 mise run measure          # bb gates of the two apps into measurements.json

@@ -1,3 +1,4 @@
+#![allow(clippy::print_stdout, clippy::print_stderr)]
 //! Writes `noir/lib/channel/src/vectors.nr`: the values the Noir library's
 //! tests compare against, computed by the wallet library from label-derived
 //! randomness (so the file is reproducible and no secret is in it).

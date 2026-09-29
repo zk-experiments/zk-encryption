@@ -309,7 +309,11 @@ impl Session {
     /// From the root, holding the next `window` chain keys and at most
     /// `window` skipped keys.
     pub fn start(s0: Fr, window: u64) -> Self {
-        Self::start_with(s0, window, window as usize)
+        Self::start_with(
+            s0,
+            window,
+            usize::try_from(window).expect("window fits usize"),
+        )
     }
 
     pub fn start_with(s0: Fr, window: u64, max_skipped: usize) -> Self {

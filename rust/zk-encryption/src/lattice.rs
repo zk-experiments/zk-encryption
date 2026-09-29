@@ -27,7 +27,7 @@ pub struct Ring;
 
 impl Ring {
     fn zeta(i: usize) -> i64 {
-        let br = (i as u8).reverse_bits() >> 1;
+        let br = u8::try_from(i).expect("i < 256").reverse_bits() >> 1;
         (0..br).fold(1, |z, _| z * 17 % Q)
     }
 
@@ -156,7 +156,11 @@ impl PqKey {
         let mut a_hat = [[[0u16; 256]; 3]; 3];
         for (i, row) in a_hat.iter_mut().enumerate() {
             for (j, poly) in row.iter_mut().enumerate() {
-                *poly = Self::sample_ntt(&ek[1152..], j as u8, i as u8)?;
+                *poly = Self::sample_ntt(
+                    &ek[1152..],
+                    u8::try_from(j).expect("j < 3"),
+                    u8::try_from(i).expect("i < 3"),
+                )?;
             }
         }
         Ok(Self {
@@ -209,10 +213,10 @@ impl Noise {
     /// CBD_2 from a byte stream (one nibble per coefficient, 7·128 bytes).
     pub fn cbd(bytes: &[u8; 7 * 128]) -> Self {
         let mut it = bytes.iter().flat_map(|b| [b & 15, b >> 4]).map(|n| {
-            let pop = |x: u8| (x & 1) + ((x >> 1) & 1);
-            (pop(n & 3) as i8) - (pop(n >> 2) as i8)
+            let pop = |x: u8| i8::try_from((x & 1) + ((x >> 1) & 1)).expect("at most 2");
+            pop(n & 3) - pop(n >> 2)
         });
-        let mut poly = || std::array::from_fn(|_| it.next().expect("7·128 bytes"));
+        let mut poly = || std::array::from_fn(|_| it.next().expect("7*128 bytes"));
         Self {
             r: [poly(), poly(), poly()],
             e1: [poly(), poly(), poly()],
@@ -228,7 +232,7 @@ impl Noise {
     /// Every coefficient at the range-check bound (±2 by the bits of `bytes`).
     pub fn extreme(bytes: &[u8; 7 * 256]) -> Self {
         let mut it = bytes.iter().map(|x| if x & 1 == 1 { 2i8 } else { -2 });
-        let mut poly = || std::array::from_fn(|_| it.next().expect("7·256 bytes"));
+        let mut poly = || std::array::from_fn(|_| it.next().expect("7*256 bytes"));
         Self {
             r: [poly(), poly(), poly()],
             e1: [poly(), poly(), poly()],
@@ -260,11 +264,8 @@ impl Ciphertext {
         let coeffs: Vec<u16> = self.u.iter().flatten().chain(&self.v).copied().collect();
         for pair in coeffs.chunks(2) {
             let (a, c) = (u32::from(pair[0]), u32::from(pair[1]));
-            b.extend([
-                (a & 0xff) as u8,
-                ((a >> 8) | (c << 4)) as u8,
-                (c >> 4) as u8,
-            ]);
+            let byte = |x: u32| u8::try_from(x & 0xff).expect("masked");
+            b.extend([byte(a), byte((a >> 8) | (c << 4)), byte(c >> 4)]);
         }
         b
     }
@@ -329,14 +330,18 @@ impl Kpke {
             let col: Vec<Poly> = (0..3).map(|j| Self::poly(&key.a_hat[j][i])).collect();
             let w = Ring::intt(Ring::mul_acc(&col, &r_hat));
             for n in 0..256 {
-                ui[n] = (w[n] + i64::from(noise.e1[i][n])).rem_euclid(Q) as u16;
+                ui[n] =
+                    u16::try_from((w[n] + i64::from(noise.e1[i][n])).rem_euclid(Q)).expect("< q");
             }
         }
         let t: Vec<Poly> = key.t_hat.iter().map(Self::poly).collect();
         let w = Ring::intt(Ring::mul_acc(&t, &r_hat));
         let mut v = [0u16; 256];
         for n in 0..256 {
-            v[n] = (w[n] + i64::from(noise.e2[n]) + 1665 * Self::bit(m, n)).rem_euclid(Q) as u16;
+            v[n] = u16::try_from(
+                (w[n] + i64::from(noise.e2[n]) + 1665 * Self::bit(m, n)).rem_euclid(Q),
+            )
+            .expect("< q");
         }
         Ok(Ciphertext { u, v })
     }
@@ -369,7 +374,7 @@ impl Kpke {
     pub fn round(w: &Poly) -> [u8; 32] {
         let mut m = [0u8; 32];
         for (n, x) in w.iter().enumerate() {
-            m[n / 8] |= ((((2 * x + 1664) / Q) % 2) as u8) << (n % 8);
+            m[n / 8] |= u8::try_from(((2 * x + 1664) / Q) % 2).expect("a bit") << (n % 8);
         }
         m
     }

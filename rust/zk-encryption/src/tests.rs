@@ -149,7 +149,7 @@ fn lattice_round_trip_and_checks() {
     bad[1] |= 0x0f; // first coefficient 4095 ≥ q
     assert_eq!(PqKey::expand(&bad), Err(Error::BadPqKey));
     // NTT round trip.
-    let f: Poly = std::array::from_fn(|i| (i as i64 * 7) % Q);
+    let f: Poly = std::array::from_fn(|i| (i64::try_from(i).expect("small") * 7) % Q);
     assert_eq!(Ring::intt(Ring::ntt(f)), f);
     // The ciphertext's bytes: 1,536, canonical.
     let bytes = ct.to_bytes();
@@ -185,8 +185,10 @@ fn decrypts_with_extreme_noise() {
             }
         }
     }
-    eprintln!("largest |noise| over 576 extreme-noise ciphertexts: {worst} (threshold 832)");
-    assert!(worst < 832);
+    assert!(
+        worst < 832,
+        "largest |noise| over 576 extreme-noise ciphertexts: {worst} (threshold 832)"
+    );
 }
 
 /// Why the receiver's secret must stay secret: a sender who knew s could

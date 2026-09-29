@@ -1,3 +1,4 @@
+#![allow(clippy::print_stdout, clippy::print_stderr)]
 //! Writes the release catalog (`catalog.json`): the library's identity, the
 //! toolchain pins, the families with their roots and layouts, and the
 //! kernels this layer folds with, so a target project can check what a
