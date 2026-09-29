@@ -1,0 +1,159 @@
+# Toolchain pins for zk-encryption, same shape as eid-circuits.
+# `mise run install:zk-toolchain` installs nargo and bb into per-version
+# directories; every task documents the raw command for non-mise users.
+
+[tools]
+# S3 client for uploads to the circuits R2 bucket (release:publish-r2).
+aws-cli = "2"
+
+[env]
+# The Noir release every package is compiled and tested with.
+NOIR_VERSION = "1.0.0-rc.3"
+# Barretenberg for gates, verification keys and Chonk proofs: the nightly
+# built on NOIR_VERSION's commit. A bb bump changes every verification key.
+BB_VERSION = "7.0.0-nightly.20260927"
+# noir-zk (registries, codegen, the generic kernels): the `feat/pipelines`
+# branch until 0.3.0 is released; rust/Cargo.toml pins the same rev.
+NOIR_ZK_REV = "dd2d33f"
+# Per-version toolchain directories: this repository never replaces the
+# nargo or bb other projects use from ~/.nargo and ~/.bb.
+NARGO_HOME = "{{env.HOME}}/.toolchains/noir-{{env.NOIR_VERSION}}"
+BB_PATH = "{{env.HOME}}/.toolchains/bb-{{env.BB_VERSION}}"
+NARGO = "{{env.NARGO_HOME}}/bin/nargo"
+BB = "{{env.BB_PATH}}/bb"
+NOIR_ZK = "{{env.HOME}}/.toolchains/noir-zk-{{env.NOIR_ZK_REV}}/bin/noir-zk"
+
+[tasks."install:noir"]
+description = "Install nargo $NOIR_VERSION into $NARGO_HOME (no shell profile changes)"
+shell = "bash -c"
+run = '''
+set -euo pipefail
+mkdir -p "$NARGO_HOME/bin"
+if [ ! -x "$NARGO_HOME/bin/noirup" ]; then
+  curl -fsSL https://raw.githubusercontent.com/noir-lang/noirup/main/noirup -o "$NARGO_HOME/bin/noirup"
+  chmod +x "$NARGO_HOME/bin/noirup"
+fi
+"$NARGO_HOME/bin/noirup" --version "$NOIR_VERSION"
+'''
+
+[tasks."install:bb"]
+description = "Install Barretenberg bb $BB_VERSION into $BB_PATH (no shell profile changes)"
+shell = "bash -c"
+run = '''
+set -euo pipefail
+if [ -x "$BB" ] && [ "$("$BB" --version)" = "$BB_VERSION" ]; then exit 0; fi
+case "$(uname -s)-$(uname -m)" in
+  Darwin-arm64) platform=arm64-darwin ;;
+  Darwin-x86_64) platform=amd64-darwin ;;
+  Linux-x86_64) platform=amd64-linux ;;
+  Linux-aarch64) platform=arm64-linux ;;
+  *) echo "unsupported platform $(uname -s)-$(uname -m)" >&2; exit 1 ;;
+esac
+mkdir -p "$BB_PATH"
+curl -fsSL "https://github.com/AztecProtocol/barretenberg/releases/download/v$BB_VERSION/barretenberg-$platform.tar.gz" | tar xz -C "$BB_PATH"
+"$BB" --version
+'''
+
+[tasks."install:zk-toolchain"]
+description = "Install nargo + bb at the pinned versions"
+depends = ["install:noir", "install:bb"]
+
+[tasks."install:noir-zk"]
+description = "Install the noir-zk CLI at the rev rust/Cargo.toml pins, in its own toolchain directory"
+shell = "bash -c"
+run = '''
+set -euo pipefail
+root="$HOME/.toolchains/noir-zk-$NOIR_ZK_REV"
+[ -x "$root/bin/noir-zk" ] || cargo install --locked --git https://github.com/zk-experiments/noir-zk --rev "$NOIR_ZK_REV" noir-zk-cli --root "$root"
+'''
+
+[tasks."compile"]
+description = "Compile the Noir workspace into noir/target"
+run = 'cd noir && "$NARGO" compile --workspace --silence-warnings'
+
+[tasks."test"]
+description = "Noir tests (the library against the reference's vectors) and the Rust tests"
+shell = "bash -c"
+run = '''
+set -euo pipefail
+(cd noir && "$NARGO" test --workspace)
+(cd rust && cargo test --release --all-features)
+'''
+
+[tasks."freeze"]
+description = "Freeze the compiled circuits into rust/zk-encryption-circuits/{circuits,resources,assets} (the bytecode is bundled from assets/)"
+depends = ["install:noir-zk"]
+run = '"$NOIR_ZK" freeze --target noir/target --out rust/zk-encryption-circuits --assets rust/zk-encryption-circuits/assets --library zk-encryption@$(sed -n "s/^version = \"\\(.*\\)\"/\\1/p" rust/Cargo.toml | head -1)'
+
+[tasks."freeze:check"]
+description = "Check the compiled circuits against their frozen pins"
+depends = ["install:noir-zk"]
+run = '"$NOIR_ZK" freeze --target noir/target --out rust/zk-encryption-circuits --assets rust/zk-encryption-circuits/assets --library zk-encryption@$(sed -n "s/^version = \"\\(.*\\)\"/\\1/p" rust/Cargo.toml | head -1) --check'
+
+[tasks."measure"]
+description = "Chonk gates of the three apps with bb, into measurements.json"
+shell = "bash -c"
+run = '''
+set -euo pipefail
+out="{"
+for c in channel_session channel_envelope; do
+  g="$("$BB" gates -b "noir/target/$c.json" --scheme chonk | sed -n 's/.*"circuit_size": *\([0-9]*\).*/\1/p' | head -1)"
+  out="$out\"$c\": $g, "
+done
+printf '%s\n' "${out%, }}" | python3 -m json.tool > measurements.json
+cat measurements.json
+'''
+
+# The release assets: the frozen manifest, a tarball of the frozen resources
+# (ABIs and keys) with its SHA-256, and catalog.json (the layer's identity:
+# library, version, toolchain pins, the families with their roots and
+# layouts, the kernels' dependency). `release:publish-r2` puts them under
+# $R2_PREFIX/<version>/ in the circuits bucket (https://circuits.zk-experiments.dev/).
+[tasks."release:assets"]
+description = "Write target/release: manifest.toml, resources.tar.gz (+ .sha256) and catalog.json for this version"
+shell = "bash -c"
+run = '''
+set -euo pipefail
+version="$(sed -n 's/^version = "\(.*\)"/\1/p' rust/Cargo.toml | head -1)"
+rm -rf target/release && mkdir -p target/release
+cp rust/zk-encryption-circuits/circuits/manifest.toml target/release/manifest.toml
+tar czf target/release/resources.tar.gz -C rust/zk-encryption-circuits resources
+(cd target/release && shasum -a 256 resources.tar.gz | cut -d' ' -f1 > resources.tar.gz.sha256)
+(cd rust && cargo run -q --release -p zk-encryption-circuits --bin catalog -- "$version" "$(cat ../target/release/resources.tar.gz.sha256)" > ../target/release/catalog.json)
+ls -l target/release
+'''
+
+[tasks."release:publish-r2"]
+description = "Upload target/release to the circuits R2 bucket under $R2_PREFIX/<version>/ and $R2_PREFIX/latest/"
+shell = "bash -c"
+run = '''
+set -euo pipefail
+: "${R2_BUCKET:?set R2_BUCKET}" "${R2_TOKEN:?set R2_TOKEN}" "${R2_ACCOUNT_ID:?set R2_ACCOUNT_ID}" "${R2_PREFIX:?set R2_PREFIX}"
+# The token is scoped to the bucket, which only R2's S3 API honours: its S3
+# credentials are the token's id and the SHA-256 of its value (Cloudflare's
+# documented derivation), as eid-circuits' packs:publish-r2.
+id=""
+for url in "https://api.cloudflare.com/client/v4/accounts/$R2_ACCOUNT_ID/tokens/verify" \
+           "https://api.cloudflare.com/client/v4/user/tokens/verify"; do
+  id="$(curl -fsS -H "Authorization: Bearer $R2_TOKEN" "$url" | jq -r '.result.id // empty' || true)"
+  [ -n "$id" ] && break
+done
+[ -n "$id" ] || { echo "R2_TOKEN doesn't verify with Cloudflare" >&2; exit 1; }
+export AWS_ACCESS_KEY_ID="$id"
+AWS_SECRET_ACCESS_KEY="$(printf '%s' "$R2_TOKEN" | shasum -a 256 | cut -d' ' -f1)"
+export AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION=auto
+export AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+endpoint="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+version="$(sed -n 's/^version = "\(.*\)"/\1/p' rust/Cargo.toml | head -1)"
+put() {
+  aws s3 cp "$1" "s3://$R2_BUCKET/$2" --endpoint-url "$endpoint" --only-show-errors \
+    --content-type "$3" --cache-control "$4"
+}
+immutable="public, max-age=31536000, immutable"
+put target/release/resources.tar.gz "$R2_PREFIX/$version/resources.tar.gz" application/gzip "$immutable"
+put target/release/resources.tar.gz.sha256 "$R2_PREFIX/$version/resources.tar.gz.sha256" text/plain "$immutable"
+put target/release/manifest.toml "$R2_PREFIX/$version/manifest.toml" application/toml "$immutable"
+put target/release/catalog.json "$R2_PREFIX/$version/catalog.json" application/json "$immutable"
+# latest last, so it only ever points at files already uploaded.
+put target/release/catalog.json "$R2_PREFIX/latest/catalog.json" application/json "public, max-age=300"
+'''

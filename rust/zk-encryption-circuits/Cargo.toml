@@ -1,0 +1,25 @@
+[package]
+name = "zk-encryption-circuits"
+version = "0.1.0"
+description = "Post-quantum encrypted channel for ZK pipelines, the circuit layer: the session and envelope apps frozen as a noir-zk registry (channel/session, channel/envelope, channel/note_envelope) with their bytecode, the zk-encryption wallet library re-exported, and the mapping between them"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+
+[dependencies]
+noir-zk-core = { git = "https://github.com/zk-experiments/noir-zk", rev = "dd2d33f" }
+noir-zk-backend = { git = "https://github.com/zk-experiments/noir-zk", rev = "dd2d33f", features = ["packs", "http"] }
+zk-encryption = { path = "../zk-encryption", version = "0.1.0" }
+serde_json = "1"
+sha3 = "0.10"
+ark-ff = "0.6"
+hex = "0.4"
+toml = "1"
+
+[build-dependencies]
+noir-zk-codegen = { git = "https://github.com/zk-experiments/noir-zk", rev = "dd2d33f" }
+
+[features]
+serde = ["zk-encryption/serde"]

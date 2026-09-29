@@ -1,0 +1,32 @@
+[package]
+name = "zk-encryption"
+version = "0.1.0"
+description = "Post-quantum encrypted channel for ZK pipelines, the wallet side: the receiver's keys, bundle and scan, the sender's handshake and ratchet, payload sealing and opening, the lattice encryption and the Poseidon2 duplex the circuits match"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+
+[dependencies]
+ark-bn254 = "0.6"
+ark-ec = "0.6"
+ark-ff = "0.6"
+ark-grumpkin = "0.6"
+pso-poseidon = "0.5"
+# The receiver's long-term ML-KEM-768 key pair (FIPS 203 key generation and the
+# expanded decapsulation key the lattice decryption reads ŝ from).
+ml-kem = { version = "0.3.2", features = ["hazmat"] }
+# SHAKE128 for the key expansion (SampleNTT) and SHA3-256 for H(ek), as FIPS 203.
+sha3 = "0.10"
+rand = "0.8"
+hex = "0.4"
+base64 = "0.22"
+serde = { version = "1", features = ["derive"], optional = true }
+
+[features]
+# `Serialize`/`Deserialize` for the persisted state (Sender, Receiver, keys).
+serde = ["dep:serde"]
+
+[dev-dependencies]
+serde_json = "1"

@@ -1,0 +1,64 @@
+# Written by noir-zk freeze; do not edit.
+
+noir = "1.0.0-rc.3"
+bb = "7.0.0-nightly.20260927"
+
+[library]
+name = "zk-encryption"
+version = "0.1.0"
+
+[[circuit]]
+label = "channel_envelope"
+version = "1.0.0"
+system = "chonk"
+role = "app"
+status = "active"
+bytecode_sha256 = "d1ede152278ccb1bce523dff352ead88efa5b26748280e52b79cc09f40b74e19"
+vk_sha256 = "de19a20467b8f9553cda92be050c31d70f7978c30c21974a138a84b78621be3a"
+vk_hash = "0x143a399e2c73c1ee4b89d85aaedbd6eb61138ffe2678f00215e36c1de36c3286"
+
+[[circuit]]
+label = "channel_session"
+version = "1.0.0"
+system = "chonk"
+role = "app"
+status = "active"
+bytecode_sha256 = "4c0ba11b08a77b8c082029e097b849a28210761007a884c5d776cdbf99944456"
+vk_sha256 = "40cf613516b66ddb0a7a146f087ae9184df48c22d817e4918f1209717ab76f30"
+vk_hash = "0x02d130d4ac4fc6b38909e13353eb36d1ca4043274acfb36567697d2c0e4719a2"
+
+# ------------------------------------------------------------ families (hand-written; freeze keeps them)
+
+# The session app: the channel's KEM and C_t, [ctx, C_t, E.x, E.y, tag, ct_commitment], all public; no link.
+# ctx is a public input passed through: the envelopes (and a transfer) are bound to it and to C_t.
+[[family]]
+layer = "channel"
+name = "session"
+members = ["channel_session"]
+public_from = 0
+slots = ["ctx", "c_t", "e_x", "e_y", "tag", "ct_commitment"]
+
+# The payload envelope app, [payload_commitment, ctx, C_t, domain, c × 6], bound to the session's ctx and C_t.
+# One circuit, two families: each pins the payload domain (K = H(KEY, S_t, ctx, domain)) with a constant
+# binding the kernel enforces, so two envelopes of one pipeline never share a keystream.
+# KEY_PAYLOAD: domain = "pq-ratchet/key-payload/v1" (an identity payload, e.g. a passport's DG1).
+[[family]]
+layer = "channel"
+name = "envelope"
+members = ["channel_envelope"]
+link_in = { index = 0, link = "PayloadCommitment" }
+binds = [{ slot = "ctx", index = 1 }, { slot = "c_t", index = 2 }]
+bind_const = [{ index = 3, value = "0x70712d726174636865742f6b65792d7061796c6f61642f7631" }]
+public_from = 4
+slots = ["c_id0", "c_id1", "c_id2", "c_id3", "c_id4", "c_id5"]
+
+# KEY_NOTE: domain = "pq-ratchet/key-note/v1" (a note opening).
+[[family]]
+layer = "channel"
+name = "note_envelope"
+members = ["channel_envelope"]
+link_in = { index = 0, link = "PayloadCommitment" }
+binds = [{ slot = "ctx", index = 1 }, { slot = "c_t", index = 2 }]
+bind_const = [{ index = 3, value = "0x70712d726174636865742f6b65792d6e6f74652f7631" }]
+public_from = 4
+slots = ["c_note0", "c_note1", "c_note2", "c_note3", "c_note4", "c_note5"]

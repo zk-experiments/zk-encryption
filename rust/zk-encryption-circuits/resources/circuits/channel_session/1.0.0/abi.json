@@ -1,0 +1,209 @@
+{
+  "abi_version": 1,
+  "error_types": {
+    "1023748310075094287": {
+      "error_kind": "string",
+      "string": "ephemeral scalar must not be zero"
+    },
+    "12469291177396340830": {
+      "error_kind": "string",
+      "string": "call to assert_max_bit_size"
+    },
+    "14990209321349310352": {
+      "error_kind": "string",
+      "string": "attempt to add with overflow"
+    },
+    "361444214588792908": {
+      "error_kind": "string",
+      "string": "attempt to multiply with overflow"
+    },
+    "5259847516249409593": {
+      "error_kind": "string",
+      "string": "receiver key must not be the point at infinity"
+    },
+    "819864067177566446": {
+      "error_kind": "string",
+      "string": "Field failed to decompose into specified 8 limbs"
+    }
+  },
+  "parameters": [
+    {
+      "name": "context",
+      "type": {
+        "kind": "field"
+      },
+      "visibility": "private"
+    },
+    {
+      "name": "channel",
+      "type": {
+        "fields": [
+          {
+            "name": "is_handshake",
+            "type": {
+              "kind": "boolean"
+            }
+          },
+          {
+            "name": "receiver",
+            "type": {
+              "fields": [
+                {
+                  "name": "x",
+                  "type": {
+                    "kind": "field"
+                  }
+                },
+                {
+                  "name": "y",
+                  "type": {
+                    "kind": "field"
+                  }
+                }
+              ],
+              "kind": "struct",
+              "path": "std::embedded_curve_ops::EmbeddedCurvePoint"
+            }
+          },
+          {
+            "name": "pq_key",
+            "type": {
+              "fields": [
+                {
+                  "name": "a_hat",
+                  "type": {
+                    "kind": "array",
+                    "length": 3,
+                    "type": {
+                      "kind": "array",
+                      "length": 3,
+                      "type": {
+                        "kind": "array",
+                        "length": 256,
+                        "type": {
+                          "kind": "field"
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "t_hat",
+                  "type": {
+                    "kind": "array",
+                    "length": 3,
+                    "type": {
+                      "kind": "array",
+                      "length": 256,
+                      "type": {
+                        "kind": "field"
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "h_ek",
+                  "type": {
+                    "kind": "array",
+                    "length": 4,
+                    "type": {
+                      "kind": "integer",
+                      "sign": "unsigned",
+                      "width": 64
+                    }
+                  }
+                }
+              ],
+              "kind": "struct",
+              "path": "channel::lattice::PqKey"
+            }
+          },
+          {
+            "name": "e",
+            "type": {
+              "kind": "field"
+            }
+          },
+          {
+            "name": "noise",
+            "type": {
+              "fields": [
+                {
+                  "name": "r",
+                  "type": {
+                    "kind": "array",
+                    "length": 3,
+                    "type": {
+                      "kind": "array",
+                      "length": 256,
+                      "type": {
+                        "kind": "field"
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "e1",
+                  "type": {
+                    "kind": "array",
+                    "length": 3,
+                    "type": {
+                      "kind": "array",
+                      "length": 256,
+                      "type": {
+                        "kind": "field"
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "e2",
+                  "type": {
+                    "kind": "array",
+                    "length": 256,
+                    "type": {
+                      "kind": "field"
+                    }
+                  }
+                }
+              ],
+              "kind": "struct",
+              "path": "channel::lattice::LatticeNoise"
+            }
+          },
+          {
+            "name": "m",
+            "type": {
+              "kind": "array",
+              "length": 32,
+              "type": {
+                "kind": "integer",
+                "sign": "unsigned",
+                "width": 8
+              }
+            }
+          },
+          {
+            "name": "s",
+            "type": {
+              "kind": "field"
+            }
+          }
+        ],
+        "kind": "struct",
+        "path": "channel::session::Channel"
+      },
+      "visibility": "private"
+    }
+  ],
+  "return_type": {
+    "abi_type": {
+      "kind": "array",
+      "length": 6,
+      "type": {
+        "kind": "field"
+      }
+    },
+    "visibility": "databus"
+  }
+}

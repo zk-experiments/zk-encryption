@@ -1,0 +1,354 @@
+# CI + release for zk-encryption (the shape of eid-circuits' ci.yml).
+#
+#   noir ──────┐
+#   rust ──────┼─> ci ──> tag (cog, push:main) ──> github-release ──> publish (release assets, R2)
+#   typos ─────┤
+#   supply-chain
+#
+# Triggers
+#   push:main         full pipeline incl. cog auto-bump and, when cog tagged, release
+#   push:tags:["v*"]  release-only path against the named tag
+#   pull_request      checks + commitlint
+#   schedule          nightly supply-chain (fresh advisories)
+#   workflow_dispatch maintainer-named (re-)release; empty `tag` runs the main pipeline
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: >-
+          Existing tag to (re-)release (e.g. "v0.1.0"). Empty input runs the
+          normal main pipeline.
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  resolve:
+    name: Resolve release tag
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.r.outputs.release_tag }}
+    steps:
+      - id: r
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          tag=""
+          case "$EVENT" in
+            push)
+              if [[ "$REF" == refs/tags/v* ]]; then
+                tag="$REF_NAME"
+              fi
+              ;;
+            workflow_dispatch)
+              tag="$INPUT_TAG"
+              ;;
+          esac
+          echo "release_tag=${tag}"
+          echo "release_tag=${tag}" >> "$GITHUB_OUTPUT"
+
+  commitlint:
+    name: Commit lint (conventional-commits)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: wagoid/commitlint-github-action@v6
+
+  # nargo fmt, nargo test (the library against the reference's vectors), the
+  # two circuits compiled and checked against their frozen pins, the samples executed.
+  noir:
+    name: Noir (fmt, test, freeze --check)
+    runs-on: ubuntu-latest
+    needs: [resolve]
+    if: needs.resolve.outputs.release_tag == '' && github.event_name != 'schedule'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: jdx/mise-action@v4
+        with:
+          install: false
+      - name: Cache the toolchains
+        id: toolchain-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.toolchains
+          key: toolchains-${{ hashFiles('mise.toml') }}
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          rust-src-dir: rust
+      - name: Install libc++
+        run: sudo apt-get update -q && sudo apt-get install -yq libc++-dev libc++abi-dev
+      - name: Install nargo, bb and the noir-zk CLI
+        if: steps.toolchain-cache.outputs.cache-hit != 'true'
+        run: mise run install:zk-toolchain install:noir-zk
+      - name: Toolchain paths
+        run: |
+          mise env --json | jq -r 'with_entries(select(.key | test("^(NARGO_HOME|BB_PATH|NARGO|BB|NOIR_ZK|NOIR_VERSION|BB_VERSION|NOIR_ZK_REV)$"))) | to_entries[] | "\(.key)=\(.value)"' >> "$GITHUB_ENV"
+          echo "$(mise env --json | jq -r .NARGO_HOME)/bin" >> "$GITHUB_PATH"
+      - name: nargo fmt --check
+        run: cd noir && nargo fmt --check
+      - name: nargo test
+        run: cd noir && nargo test --workspace
+      - name: nargo compile
+        run: mise run compile
+      - name: Execute the samples
+        run: cd noir && nargo execute --package channel_session && nargo execute --package channel_envelope
+      - name: Cache the bb CRS
+        uses: actions/cache@v4
+        with:
+          path: ~/.bb-crs
+          key: bb-crs-${{ hashFiles('mise.toml') }}
+      - name: The compiled circuits match their frozen pins
+        run: mise run freeze:check
+      - name: Committed measurements are current
+        run: |
+          mise run measure
+          git diff --exit-code -- measurements.json
+
+  rust:
+    name: Rust (fmt, clippy, test, vector drift)
+    runs-on: ubuntu-latest
+    needs: [resolve]
+    if: needs.resolve.outputs.release_tag == '' && github.event_name != 'schedule'
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt, clippy
+          rust-src-dir: rust
+      # noir-zk-backend links bb's static library against libc++.
+      - name: Install libc++
+        run: sudo apt-get update -q && sudo apt-get install -yq libc++-dev libc++abi-dev
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+      - name: clippy (code-smell set)
+        run: |
+          cargo clippy --all-targets --all-features -- -D warnings \
+            -D clippy::dbg_macro -D clippy::print_stdout -D clippy::print_stderr \
+            -D clippy::todo -D clippy::unimplemented -D clippy::exit \
+            -D clippy::cast_lossless -D clippy::cast_possible_truncation \
+            -D clippy::cast_possible_wrap -D clippy::cast_precision_loss \
+            -D clippy::cast_sign_loss -D clippy::clone_on_ref_ptr \
+            -D clippy::empty_enums -D clippy::enum_glob_use -D clippy::if_not_else \
+            -D clippy::mut_mut -D clippy::non_ascii_literal -D clippy::single_match_else \
+            -D clippy::string_add -D clippy::string_add_assign \
+            -D clippy::string_lit_as_bytes -D clippy::unnecessary_unwrap \
+            -D clippy::unused_self -D clippy::useless_let_if_seq \
+            -A clippy::module_name_repetitions -A clippy::must_use_candidate \
+            -A clippy::missing_errors_doc -A clippy::missing_panics_doc \
+            -A clippy::too_many_lines -A clippy::similar_names -A clippy::inline_always \
+            -A clippy::unwrap_used -A clippy::expect_used -A clippy::panic
+      - name: cargo test (both crates, serde on and off)
+        run: |
+          cargo test --release -p zk-encryption
+          cargo test --release --workspace --all-features
+      - name: Generated Noir vectors are current
+        run: cargo run -q --release -p zk-encryption-circuits --bin vectors -- --check
+
+  typos:
+    name: typos
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: crate-ci/typos@v1.50.2
+        with:
+          config: ./typos.toml
+
+  supply-chain:
+    name: supply chain
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v5
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny,cargo-audit
+      - name: cargo deny
+        run: cargo deny --all-features check all
+      - name: cargo audit
+        run: cargo audit
+
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [noir, rust, typos, supply-chain]
+    steps:
+      - name: Check dependency results
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          echo "$RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          if echo "$RESULTS" | jq -e 'any(.[]; .result == "failure" or .result == "cancelled")' > /dev/null; then
+            echo "::error::one or more required jobs did not succeed"
+            exit 1
+          fi
+
+  tag:
+    name: Bump version & tag
+    runs-on: ubuntu-latest
+    needs: [resolve, ci]
+    if: |
+      always() &&
+      needs.ci.result == 'success' &&
+      needs.resolve.outputs.release_tag == '' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      !startsWith(github.event.head_commit.message, 'chore(version):') &&
+      !contains(github.event.head_commit.message, '[skip ci]')
+    outputs:
+      tag: ${{ steps.bump.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          rust-src-dir: rust
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Cocogitto bump
+        uses: cocogitto/cocogitto-action@v4
+        with:
+          command: bump
+          args: --auto
+          git-user: "github-actions[bot]"
+          git-user-email: "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Resolve created tag (if any)
+        id: bump
+        run: |
+          set -euo pipefail
+          tag="$(git tag --points-at HEAD | grep '^v' | head -n1 || true)"
+          echo "tag=${tag}"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+  github-release:
+    name: Create GitHub release
+    runs-on: ubuntu-latest
+    needs: [resolve, tag]
+    if: |
+      always() &&
+      ((needs.tag.result == 'success' && needs.tag.outputs.tag != '') ||
+       needs.resolve.outputs.release_tag != '')
+    steps:
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.tag.outputs.tag || needs.resolve.outputs.release_tag }}
+          name: ${{ needs.tag.outputs.tag || needs.resolve.outputs.release_tag }}
+          generate_release_notes: true
+
+  # The release assets: the frozen manifest, the frozen resources (ABIs and
+  # keys) as a tarball with its SHA-256, and catalog.json, uploaded to the
+  # GitHub release and to the circuits bucket under
+  # https://circuits.zk-experiments.dev/<R2_PREFIX>/<version>/ (and
+  # <R2_PREFIX>/latest/catalog.json). The prefix is a workflow variable so
+  # other repositories share the bucket under their own prefixes.
+  publish:
+    name: Publish release assets
+    runs-on: ubuntu-latest
+    needs: [resolve, tag, github-release]
+    if: always() && needs.github-release.result == 'success'
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ needs.tag.outputs.tag || needs.resolve.outputs.release_tag }}
+      R2_PREFIX: ${{ vars.R2_PREFIX_ZK_ENCRYPTION || 'zk-encryption' }}
+      R2_BASE: https://circuits.zk-experiments.dev
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.tag.outputs.tag || needs.resolve.outputs.release_tag }}
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          rust-src-dir: rust
+      - name: Install libc++
+        run: sudo apt-get update -q && sudo apt-get install -yq libc++-dev libc++abi-dev
+      - uses: jdx/mise-action@v4
+      - name: Install nargo, bb and the noir-zk CLI
+        run: mise run install:zk-toolchain install:noir-zk
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bb-crs
+          key: bb-crs-${{ hashFiles('mise.toml') }}
+      - name: Compile and check the circuits against their pins
+        run: |
+          mise run compile
+          mise run freeze:check
+      - name: Write the release assets
+        run: mise run release:assets
+      - name: Upload to the release
+        run: |
+          set -euo pipefail
+          for f in target/release/manifest.toml target/release/resources.tar.gz target/release/resources.tar.gz.sha256 target/release/catalog.json; do
+            gh release upload "$TAG" "$f" --clobber
+          done
+      - name: Upload to the circuits R2 bucket
+        if: vars.R2_CIRCUITS_ZK_EXPERIMENTS_BUCKET != ''
+        env:
+          R2_TOKEN: ${{ secrets.R2_ZK_EXPERIMENTS_TOKEN }}
+          R2_BUCKET: ${{ vars.R2_CIRCUITS_ZK_EXPERIMENTS_BUCKET }}
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID || secrets.R2_ACCOUNT_ID }}
+        run: mise run release:publish-r2
+      - name: The published files answer and match the release assets
+        if: vars.R2_CIRCUITS_ZK_EXPERIMENTS_BUCKET != ''
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          base="$R2_BASE/$R2_PREFIX/$version"
+          for i in 1 2 3 4 5 6; do
+            curl -fsS "$base/catalog.json" -o published-catalog.json && break
+            sleep 10
+          done
+          cmp published-catalog.json target/release/catalog.json
+          curl -fsS "$base/resources.tar.gz" -o published.tar.gz
+          echo "$(cat target/release/resources.tar.gz.sha256)  published.tar.gz" | shasum -a 256 -c
+          curl -fsS "$R2_BASE/$R2_PREFIX/latest/catalog.json" | cmp - target/release/catalog.json
+      - name: Add the downloads to the release notes
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          base="$R2_BASE/$R2_PREFIX/$version"
+          {
+            gh release view "$TAG" --json body -q .body
+            echo
+            echo "## Frozen circuits"
+            echo
+            echo "[\`catalog.json\`]($base/catalog.json) (the families and their roots), [\`manifest.toml\`]($base/manifest.toml), [\`resources.tar.gz\`]($base/resources.tar.gz) (ABIs and verification keys, SHA-256 \`$(cat target/release/resources.tar.gz.sha256)\`); the same files are attached to this release. The \`zk-encryption-circuits\` crate carries the bytecode and every pin, so the host is a mirror, not a trust anchor."
+          } > notes.md
+          gh release edit "$TAG" --notes-file notes.md

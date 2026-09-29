@@ -1,0 +1,2 @@
+[workspace]
+members = ["lib/channel", "circuits/session", "circuits/envelope6"]
