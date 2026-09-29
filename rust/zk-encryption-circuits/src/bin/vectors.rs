@@ -156,7 +156,12 @@ fn main() {
     let text = channel_vectors();
     if std::env::args().any(|a| a == "--check") {
         let committed = std::fs::read_to_string(path).unwrap_or_default();
-        let norm = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
+        // Modulo `nargo fmt`'s reflow (whitespace and trailing commas).
+        let norm = |s: &str| {
+            s.chars()
+                .filter(|c| !c.is_whitespace() && *c != ',')
+                .collect::<String>()
+        };
         if norm(&committed) != norm(&text) {
             eprintln!("stale: {path} (rerun without --check)");
             std::process::exit(1);
