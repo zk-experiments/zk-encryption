@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.1.1 - 2026-09-29
+#### Build
+- depend on noir-zk 0.3.0 from crates.io - (8696562) - Anton Velichko
+#### Continuous Integration
+- (**release**) release a patch for build commits - (cd0b2d4) - Anton Velichko
+
+- - -
+
 ## v0.1.0 - 2026-09-29
 #### Features
 - the post-quantum encrypted channel as a layer for zk pipelines - (62f77f5) - Anton Velichko
