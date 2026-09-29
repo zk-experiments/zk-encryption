@@ -18,7 +18,7 @@ A post-quantum encrypted channel for zero-knowledge pipelines: a pairwise handsh
 
 **Constant-binding domains.** One envelope circuit serves both families: the payload domain is an input the app writes into its record, and each family pins it with `bind_const` (a noir-zk layout entry the kernel enforces). The sender doesn't choose the domain, two envelopes of one pipeline never share a keystream, and a pipeline folding the circuit twice under one domain is refused at build. Another payload (another domain string) is another family over the same frozen key.
 
-This freeze's roots (`zk-encryption@0.1.0`, noir 1.0.0-rc.3, bb 7.0.0-nightly.20260927, noir-zk `dd2d33f`): see `measurements.json` for the gates and the release's `catalog.json` for the roots and layouts.
+This freeze's roots (`zk-encryption@0.1.0`, noir 1.0.0-rc.3, bb 7.0.0-nightly.20260927, noir-zk 0.3.0): see `measurements.json` for the gates and the release's `catalog.json` for the roots and layouts.
 
 ## Receiver flow
 
@@ -112,4 +112,4 @@ CI (`.github/workflows/ci.yml`) runs fmt, clippy and the tests of both crates (w
 
 The prefix `zk-encryption/` is the workflow variable `R2_PREFIX_ZK_ENCRYPTION` so other repositories share the bucket under their own prefixes. The crate carries the bytecode and every pin (`BYTECODE_SHA256`, `VK_SHA256`, `vk_hash`), so the host is a mirror, not a trust anchor.
 
-noir-zk is a git dependency at a pinned revision of its `feat/pipelines` branch (`rust/Cargo.toml`, `mise.toml`); it moves to a crates.io version when noir-zk 0.3.0 is released.
+noir-zk comes from crates.io at an exact version (`=0.3.0` in `rust/zk-encryption-circuits/Cargo.toml`, `NOIR_ZK_VERSION` in `mise.toml`): its kernels' family is in every pipeline root, so a bump is deliberate.

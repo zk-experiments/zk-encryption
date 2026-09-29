@@ -109,7 +109,7 @@ jobs:
         run: mise run install:zk-toolchain install:noir-zk
       - name: Toolchain paths
         run: |
-          mise env --json | jq -r 'with_entries(select(.key | test("^(NARGO_HOME|BB_PATH|NARGO|BB|NOIR_ZK|NOIR_VERSION|BB_VERSION|NOIR_ZK_REV)$"))) | to_entries[] | "\(.key)=\(.value)"' >> "$GITHUB_ENV"
+          mise env --json | jq -r 'with_entries(select(.key | test("^(NARGO_HOME|BB_PATH|NARGO|BB|NOIR_ZK|NOIR_VERSION|BB_VERSION|NOIR_ZK_VERSION)$"))) | to_entries[] | "\(.key)=\(.value)"' >> "$GITHUB_ENV"
           echo "$(mise env --json | jq -r .NARGO_HOME)/bin" >> "$GITHUB_PATH"
       - name: nargo fmt --check
         run: cd noir && nargo fmt --check
