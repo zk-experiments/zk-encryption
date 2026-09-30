@@ -19,6 +19,9 @@ post_bump_hooks = [
 # patch like a fix.
 [commit_types]
 build = { changelog_title = "Build", bump_patch = true }
+# A circuit made cheaper (`perf:`) is refrozen under a new version and key, so it releases a patch
+# too: consumers pin the release that carries it.
+perf = { changelog_title = "Performance", bump_patch = true }
 
 [changelog]
 path = "CHANGELOG.md"

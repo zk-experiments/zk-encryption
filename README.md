@@ -18,7 +18,7 @@ A post-quantum encrypted channel for zero-knowledge pipelines: a pairwise handsh
 
 **Constant-binding domains.** One envelope circuit serves both families: the payload domain is an input the app writes into its record, and each family pins it with `bind_const` (a noir-zk layout entry the kernel enforces). The sender doesn't choose the domain, two envelopes of one pipeline never share a keystream, and a pipeline folding the circuit twice under one domain is refused at build. Another payload (another domain string) is another family over the same frozen key.
 
-This freeze's roots (`zk-encryption@0.1.0`, noir 1.0.0-rc.3, bb 7.0.0-nightly.20260927, noir-zk 0.3.0): see `measurements.json` for the gates and the release's `catalog.json` for the roots and layouts.
+This freeze's roots (`zk-encryption@0.1.2`: `channel_session` 1.1.0, `channel_envelope` 1.0.0; noir 1.0.0-rc.3, bb 7.0.0-nightly.20260927, noir-zk 0.3.0): see `measurements.json` for the gates and the release's `catalog.json` for the roots and layouts.
 
 ## Receiver flow
 
