@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.1.3 - 2026-09-30
+#### Build
+- depend on noir-zk 0.3.3, refrozen as zk-encryption@0.1.3 - (068ed4c) - Anton Velichko
+
+- - -
+
 ## v0.1.2 - 2026-09-30
 #### Performance
 - (**session**) 3,254 fewer gates in the lattice encryption (channel_session 1.1.0) - (c24bac3) - Anton Velichko
