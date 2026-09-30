@@ -4,7 +4,7 @@ The post-quantum channel as one building block for noir-zk pipelines: the circui
 
 ## What the layer is
 
-**Circuits** (`circuits/manifest.toml`, frozen by `noir-zk freeze --library zk-encryption@0.1.2`, bytecode bundled: no packs, no download):
+**Circuits** (`circuits/manifest.toml`, frozen by `noir-zk freeze --library zk-encryption@0.1.3`, bytecode bundled: no packs, no download):
 
 | family | circuit | record | what it does |
 |---|---|---|---|
