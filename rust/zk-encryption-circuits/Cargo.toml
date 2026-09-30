@@ -9,8 +9,8 @@ publish.workspace = true
 repository.workspace = true
 
 [dependencies]
-noir-zk-core = "=0.3.0"
-noir-zk-backend = { version = "=0.3.0", features = ["packs", "http"] }
+noir-zk-core = "=0.3.3"
+noir-zk-backend = { version = "=0.3.3", features = ["packs", "http"] }
 zk-encryption = { path = "../zk-encryption", version = "0.1.0" }
 serde_json = "1"
 sha3 = "0.10"
@@ -19,7 +19,7 @@ hex = "0.4"
 toml = "1"
 
 [build-dependencies]
-noir-zk-codegen = "=0.3.0"
+noir-zk-codegen = "=0.3.3"
 
 [features]
 serde = ["zk-encryption/serde"]
