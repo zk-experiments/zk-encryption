@@ -47,14 +47,16 @@ unconstrained fn divmod_q(x: Field) -> (Field, Field) {
 }
 
 /// A representative of `x mod q` below 2^12 (not necessarily below q).
-/// Requires x to be an integer in [0, 2^(QB + 11)) so the quotient fits `QB`
-/// bits; callers add a multiple of q to signed values first.
+/// Requires x to be an integer in [0, q·2^QB), so the quotient fits `QB` bits;
+/// callers add a multiple of q to signed values first.
 fn reduce_lazy<let QB: u32>(x: Field) -> Field {
-    // Safety: the quotient and remainder are range checked and recombined.
+    // Safety: qq < 2^QB and r < 2^12 bound qq·q + r below q·2^QB + 2^12 < p,
+    // and 0 ≤ x < p, so qq·q + r = x holds over the integers and r ≡ x (mod q)
+    // whatever the prover hints.
     let (qq, r) = unsafe { divmod_q(x) };
     r.assert_max_bit_size::<12>();
     qq.assert_max_bit_size::<QB>();
-    assert(qq * Q + r == x);
+    assert_eq(qq * Q + r, x);
     r
 }
 
@@ -76,18 +78,18 @@ unconstrained fn identity(x: Field) -> Field {
 fn materialize(x: Field) -> Field {
     // Safety: constrained equal to x.
     let w = unsafe { identity(x) };
-    assert(w == x);
+    assert_eq(w, x);
     w
 }
 
-/// Offsets (multiples of q) that make the signed values below non-negative
-/// before a reduction.
-global OFF_MUL: Field = 3329 * 0x4000000000000000000000000; // q·2^98 > 2^109
-global OFF_OUT: Field = 3329 * 0x40000000000000000000000000; // q·2^102 > 2^113
+/// The multiple of q that makes the signed output below non-negative before
+/// its one reduction.
+global OFF_OUT: Field = 3329 * 0x100000000000000000000000000000000000000000000; // q·2^176 > 2^186.9
 
 /// NTT (Algorithm 9) over the integers, no reductions: every layer output is
-/// one witness, a linear combination of two. Input |f| ≤ 2 (CBD), output
-/// |f| < 2·3329^7 < 2^83, congruent mod q to the FIPS 203 NTT.
+/// one witness, a linear combination of two. The twiddles are centered
+/// (|ζ| ≤ 1664), so input |f| ≤ 2 (CBD) gives output |f| ≤ 2·1665^7 < 2^76,
+/// congruent mod q to the FIPS 203 NTT.
 fn ntt(f_in: Poly) -> Poly {
     let mut f = f_in;
     for layer in 0..7 {
@@ -107,8 +109,9 @@ fn ntt(f_in: Poly) -> Poly {
     f
 }
 
-/// NTT⁻¹ without the final 3303 factor (Algorithm 10), no reductions.
-/// Input 0 ≤ f < 2^12, output |f| < 2^12·6656^7 < 2^101.
+/// NTT⁻¹ without the final 3303 ≡ -26 factor (Algorithm 10), no reductions;
+/// the last layer isn't materialized (each output feeds one reduction).
+/// Input |f| < 2^100.2, output |f| < 2^100.2·3330^7 < 2^182.2.
 fn intt_unscaled(f_in: Poly) -> Poly {
     let mut f = f_in;
     for layer in 0..7 {
@@ -120,16 +123,19 @@ fn intt_unscaled(f_in: Poly) -> Poly {
                 let t = f[j];
                 f[j] = t + f[j + len];
                 f[j + len] = zeta * (f[j + len] - t);
-                f[j + len] = materialize(f[j + len]);
-                f[j] = materialize(f[j]);
+                if layer < 6 {
+                    f[j + len] = materialize(f[j + len]);
+                    f[j] = materialize(f[j]);
+                }
             }
         }
     }
     f
 }
 
-/// Σⱼ a[j] ∘ b[j] in the NTT domain (Algorithms 11, 12), lazily reduced.
-/// 0 ≤ a < 2^12, |b| < 2^83, so |c| < 3·(2^95 + 2^106.7) < 2^109.
+/// Σⱼ a[j] ∘ b[j] in the NTT domain (Algorithms 11, 12), not reduced.
+/// 0 ≤ a < 2^12 (commit_expanded checks it), |b| < 2^76, |γ| ≤ 1664, so
+/// |c| < 3·2^12·1665·2^76 < 2^100.2.
 fn mul_acc(a: [Poly; 3], b: [Poly; 3]) -> Poly {
     let mut out: Poly = [0; 256];
     for i in 0..128 {
@@ -140,8 +146,8 @@ fn mul_acc(a: [Poly; 3], b: [Poly; 3]) -> Poly {
             c0 += a0 * b0 + GAMMAS[i] * a1 * b1;
             c1 += a0 * b1 + a1 * b0;
         }
-        out[2 * i] = reduce_lazy::<100>(c0 + OFF_MUL);
-        out[2 * i + 1] = reduce_lazy::<100>(c1 + OFF_MUL);
+        out[2 * i] = materialize(c0);
+        out[2 * i + 1] = materialize(c1);
     }
     out
 }
@@ -193,6 +199,10 @@ fn assert_small(x: Field) {
 /// prover (range checked to |x| ≤ 2) instead of PRF/CBD sampling, and no
 /// compression: returns u = NTT⁻¹(Âᵀ∘NTT(r)) + e1 and
 /// v = NTT⁻¹(t̂ᵀ∘NTT(r)) + e2 + Decompress_1(m), canonical mod q.
+/// Requires every coefficient of `a_hat` and `t_hat` below 2^12, as
+/// `handshake_kem` checks through `commit_expanded`: the bounds that let the
+/// NTT, `mul_acc` and the final reductions run without wrapping depend on it.
+/// Then 0 < −26·w + e + OFF_OUT < 2^188.4 < q·2^177 for each output.
 pub fn lattice_encrypt(
     a_hat: [[Poly; 3]; 3],
     t_hat: [Poly; 3],
@@ -214,7 +224,7 @@ pub fn lattice_encrypt(
         let col = [a_hat[0][i], a_hat[1][i], a_hat[2][i]]; // (Âᵀ)[i][j] = Â[j][i]
         let w = intt_unscaled(mul_acc(col, r_hat));
         for n in 0..256 {
-            u[i][n] = reduce::<104>(3303 * w[n] + e1[i][n] + OFF_OUT);
+            u[i][n] = reduce::<177>(-26 * w[n] + e1[i][n] + OFF_OUT);
         }
     }
     let w = intt_unscaled(mul_acc(t_hat, r_hat));
@@ -224,7 +234,7 @@ pub fn lattice_encrypt(
         for t in 0..8 {
             let n = 8 * b + t;
             assert_small(e2[n]);
-            v[n] = reduce::<104>(3303 * w[n] + e2[n] + 1665 * bits[t] as Field + OFF_OUT);
+            v[n] = reduce::<177>(-26 * w[n] + e2[n] + 1665 * bits[t] as Field + OFF_OUT);
         }
     }
     (u, v)

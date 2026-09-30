@@ -5,7 +5,7 @@ bb = "7.0.0-nightly.20260927"
 
 [library]
 name = "zk-encryption"
-version = "0.1.0"
+version = "0.1.2"
 
 [[circuit]]
 label = "channel_envelope"
@@ -22,10 +22,20 @@ label = "channel_session"
 version = "1.0.0"
 system = "chonk"
 role = "app"
-status = "active"
+status = "deprecated"
 bytecode_sha256 = "4c0ba11b08a77b8c082029e097b849a28210761007a884c5d776cdbf99944456"
 vk_sha256 = "40cf613516b66ddb0a7a146f087ae9184df48c22d817e4918f1209717ab76f30"
 vk_hash = "0x02d130d4ac4fc6b38909e13353eb36d1ca4043274acfb36567697d2c0e4719a2"
+
+[[circuit]]
+label = "channel_session"
+version = "1.1.0"
+system = "chonk"
+role = "app"
+status = "active"
+bytecode_sha256 = "db1901e7667f092945bf33fd7cd70d4a992b7321a3f3b5d469b14389e3d464dc"
+vk_sha256 = "3e6b96ce01881214588aac2f53d1b08ef2989d4f7e8993b3b5a31d50171013df"
+vk_hash = "0x2b2dbdd8c55c9a268e8de818a22f00950448e79f2833c88ba03fa8e288de514c"
 
 # ------------------------------------------------------------ families (hand-written; freeze keeps them)
 
