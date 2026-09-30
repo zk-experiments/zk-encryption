@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.1.2 - 2026-09-30
+#### Performance
+- (**session**) 3,254 fewer gates in the lattice encryption (channel_session 1.1.0) - (c24bac3) - Anton Velichko
+#### Continuous Integration
+- (**release**) release a patch for perf commits - (094a808) - Anton Velichko
+#### Miscellaneous Chores
+- add noir-lang's noir-idioms and noir-optimize-acir skills - (48e03e2) - Anton Velichko
+
+- - -
+
 ## v0.1.1 - 2026-09-29
 #### Build
 - depend on noir-zk 0.3.0 from crates.io - (8696562) - Anton Velichko
