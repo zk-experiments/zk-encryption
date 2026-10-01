@@ -1,17 +1,23 @@
 [package]
 name = "zk-encryption-circuits"
-version = "0.1.0"
+version.workspace = true
 description = "Post-quantum encrypted channel for ZK pipelines, the circuit layer: the session and envelope apps frozen as a noir-zk registry (channel/session, channel/envelope, channel/note_envelope) with their bytecode, the zk-encryption wallet library re-exported, and the mapping between them"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-publish.workspace = true
+# Published after zk-encryption, at the same version: it re-exports that crate (`wallet`), and the
+# two must come from one release for their types to be the same.
+publish = true
 repository.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/zk-encryption-circuits"
+keywords = ["zero-knowledge", "noir", "post-quantum", "folding", "circuits"]
+categories = ["cryptography"]
 
 [dependencies]
 noir-zk-core = "=0.3.3"
 noir-zk-backend = { version = "=0.3.3", features = ["packs", "http"] }
-zk-encryption = { path = "../zk-encryption", version = "0.1.0" }
+zk-encryption = { path = "../zk-encryption", version = "0.1" }
 serde_json = "1"
 sha3 = "0.10"
 ark-ff = "0.6"
