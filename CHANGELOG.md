@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.1.5 - 2026-10-01
+#### Build
+- publish zk-encryption-circuits on crates.io - (ac0bf6c) - Anton Velichko
+#### Continuous Integration
+- read the crates.io token from CRATES_PUBLISHING_TOKEN - (8fd46de) - Anton Velichko
+
+- - -
+
 ## v0.1.4 - 2026-10-01
 #### Build
 - publish zk-encryption on crates.io - (bb74841) - Anton Velichko
