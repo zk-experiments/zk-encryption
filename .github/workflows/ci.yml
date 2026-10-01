@@ -2,6 +2,7 @@
 #
 #   noir ──────┐
 #   rust ──────┼─> ci ──> tag (cog, push:main) ──> github-release ──> publish (release assets, R2)
+#                                                                 └──> crates-io (zk-encryption)
 #   typos ─────┤
 #   supply-chain
 #
@@ -274,6 +275,36 @@ jobs:
           tag_name: ${{ needs.tag.outputs.tag || needs.resolve.outputs.release_tag }}
           name: ${{ needs.tag.outputs.tag || needs.resolve.outputs.release_tag }}
           generate_release_notes: true
+
+  # The wallet crate on crates.io, at the released tag. A version already
+  # published (a re-release of an existing tag) is skipped: crates.io refuses
+  # a second upload of a version anyway.
+  crates-io:
+    name: Publish zk-encryption to crates.io
+    runs-on: ubuntu-latest
+    needs: [resolve, tag, github-release]
+    if: always() && needs.github-release.result == 'success'
+    env:
+      TAG: ${{ needs.tag.outputs.tag || needs.resolve.outputs.release_tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.tag.outputs.tag || needs.resolve.outputs.release_tag }}
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          rust-src-dir: rust
+      - name: cargo publish
+        working-directory: rust
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          if curl -fsS -A "zk-encryption-ci" "https://crates.io/api/v1/crates/zk-encryption/$version" >/dev/null 2>&1; then
+            echo "zk-encryption $version is already on crates.io"
+            exit 0
+          fi
+          cargo publish -p zk-encryption --locked
 
   # The release assets: the frozen manifest, the frozen resources (ABIs and
   # keys) as a tarball with its SHA-256, and catalog.json, uploaded to the
