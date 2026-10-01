@@ -2,7 +2,7 @@
 #
 #   noir ──────┐
 #   rust ──────┼─> ci ──> tag (cog, push:main) ──┬─> publish (release assets, R2) ──┬─> github-release
-#                                                 └─> crates-io (zk-encryption) ─────┘
+#                                                 └─> crates-io (zk-encryption, zk-encryption-circuits) ─┘
 #
 # Everything is published before the GitHub release exists: a release only
 # appears once its assets answer on the CDN and its crate is on crates.io.
@@ -268,7 +268,7 @@ jobs:
   # published (a re-release of an existing tag) is skipped: crates.io refuses
   # a second upload of a version anyway.
   crates-io:
-    name: Publish zk-encryption to crates.io
+    name: Publish the crates to crates.io
     runs-on: ubuntu-latest
     needs: [resolve, tag]
     if: |
@@ -284,6 +284,10 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           rust-src-dir: rust
+      # zk-encryption-circuits links bb's static library (noir-zk-backend), which needs libc++.
+      - name: Install libc++
+        run: sudo apt-get update -q && sudo apt-get install -yq libc++-dev libc++abi-dev
+      # In dependency order: the wallet crate, then the circuit layer that re-exports it.
       - name: cargo publish
         working-directory: rust
         env:
@@ -291,11 +295,13 @@ jobs:
         run: |
           set -euo pipefail
           version="${TAG#v}"
-          if curl -fsS -A "zk-encryption-ci" "https://crates.io/api/v1/crates/zk-encryption/$version" >/dev/null 2>&1; then
-            echo "zk-encryption $version is already on crates.io"
-            exit 0
-          fi
-          cargo publish -p zk-encryption --locked
+          for crate in zk-encryption zk-encryption-circuits; do
+            if curl -fsS -A "zk-encryption-ci" "https://crates.io/api/v1/crates/$crate/$version" >/dev/null 2>&1; then
+              echo "$crate $version is already on crates.io"
+              continue
+            fi
+            cargo publish -p "$crate" --locked
+          done
 
   # The release assets: the frozen manifest, the frozen resources (ABIs and
   # keys) as a tarball with its SHA-256, and catalog.json, uploaded to the
