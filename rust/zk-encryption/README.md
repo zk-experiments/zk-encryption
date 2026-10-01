@@ -1,4 +1,4 @@
-# pq-channel
+# zk-encryption
 
 The post-quantum envelope channel of the folded eid + Emit V2 transfer, as a Rust library: everything a wallet or a receiver service does off-chain, matching the circuits in [`noir/`](../../noir). The protocol is [`PROTOCOL.md`](../../PROTOCOL.md); this crate is its reference implementation, and [`rust/reference`](../reference) drives it through real folded proofs against a mock chain.
 
@@ -19,12 +19,12 @@ No proving here: the crate has no dependency on the Noir toolchain or barretenbe
 | `emit` | Emit V2's hashes (`Emit`), `NoteOpening`, `Kem` (the session app's outputs with the carried ciphertext), the `Envelope` event with its 2,080-byte layout, `Delivery`, `Dg1` (its encoding as a 6-field payload, `to_payload`/`from_payload`, and its sealing); `NoteOpening` is a payload too. |
 | `witness` | `NoirToml`: the session app's inputs (`context` and the `channel` tables) and the envelope apps' inputs (the payload, its commitment salt, `context`, `s`), in the `Prover.toml` layout the circuits take. |
 
-`Error` is the crate's one error type (bundle parsing has its own, `bundle::BundleError`). Field elements are `ark_bn254::Fr`, re-exported as `pq_channel::Fr`.
+`Error` is the crate's one error type (bundle parsing has its own, `bundle::BundleError`). Field elements are `ark_bn254::Fr`, re-exported as `zk_encryption::Fr`.
 
 ## Receiver flow
 
 ```rust
-use pq_channel::{bundle::{Bundle, Ek}, emit::{Delivery, Emit, Envelope}, receiver::{Receiver, Scan}};
+use zk_encryption::{bundle::{Bundle, Ek}, emit::{Delivery, Emit, Envelope}, receiver::{Receiver, Scan}};
 
 // Once: long-term keys and the bundle to publish. `pk` is the shielded
 // address (Emit::pk(sk)) transfers to this receiver commit their note to.
@@ -53,7 +53,7 @@ match receiver.scan(&delivery) {
 ## Sender flow
 
 ```rust
-use pq_channel::{sender::Sender, witness::NoirToml};
+use zk_encryption::{sender::Sender, witness::NoirToml};
 
 // Once per receiver: accept the bundle (format, chain, validity, V, ek and
 // its commitment). `fetch` resolves an ek URL, or `&|_| None` for inline only.
@@ -85,4 +85,4 @@ Nothing here is constant-time beyond what the underlying crates provide; see PRO
 
 ## Tests
 
-`cargo test -p pq-channel --release` (add `--features serde` for the persistence round trip): known answers against nargo, decryption of real ML-KEM-768 ciphertexts, the extreme-noise bound, the ratchet's windows, the bundle, and a receiver's scans over natively built transfers. The folded proofs are exercised by `rust/reference`'s e2e test.
+`cargo test -p zk-encryption --release` (add `--features serde` for the persistence round trip): known answers against nargo, decryption of real ML-KEM-768 ciphertexts, the extreme-noise bound, the ratchet's windows, the bundle, and a receiver's scans over natively built transfers. The folded proofs are exercised by `rust/reference`'s e2e test.

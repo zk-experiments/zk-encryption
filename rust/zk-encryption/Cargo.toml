@@ -1,12 +1,17 @@
 [package]
 name = "zk-encryption"
-version = "0.1.0"
+version.workspace = true
 description = "Post-quantum encrypted channel for ZK pipelines, the wallet side: the receiver's keys, bundle and scan, the sender's handshake and ratchet, payload sealing and opening, the lattice encryption and the Poseidon2 duplex the circuits match"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-publish.workspace = true
+# The one crate of this workspace on crates.io (the circuits ship as release assets on the CDN).
+publish = true
 repository.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/zk-encryption"
+keywords = ["zero-knowledge", "post-quantum", "ml-kem", "poseidon2", "noir"]
+categories = ["cryptography"]
 
 [dependencies]
 ark-bn254 = "0.6"
