@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.1.4 - 2026-10-01
+#### Build
+- publish zk-encryption on crates.io - (bb74841) - Anton Velichko
+#### Continuous Integration
+- publish the crate and the assets before the GitHub release - (104272c) - Anton Velichko
+
+- - -
+
 ## v0.1.3 - 2026-09-30
 #### Build
 - depend on noir-zk 0.3.3, refrozen as zk-encryption@0.1.3 - (068ed4c) - Anton Velichko
